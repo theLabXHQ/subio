@@ -1,0 +1,58 @@
+subio — Copyright (c) 2026 theLabX. Licensed under the MIT License (see LICENSE).
+
+Third-party components:
+  * golang.org/x/net (dns/dnsmessage is used only in a benchmark; idna is
+    linked) and golang.org/x/text — BSD-3-Clause, Copyright The Go Authors.
+    golang.org/x/net/idna provides the IDNA2008 / UTS-46 hostname
+    canonicalization in internal/scope.
+  * golang.org/x/sys — BSD-3-Clause, Copyright The Go Authors. Linked on Linux
+    only, for SO_REUSEPORT on the sockets of the benchmark's loopback fixture
+    (internal/bench/reuseport_linux.go).
+
+These are the only external modules subio links. The DNS wire codec in
+internal/dnsfast is first-party rather than a dependency, which is a
+deliberate choice measured rather than assumed: against
+golang.org/x/net/dns/dnsmessage it builds a query in 42 ns instead of 143 ns
+and classifies a response in 59 ns instead of 303 ns, both with zero
+allocations (see internal/dnsfast/compare_test.go). The DNS stage resolves
+hundreds of thousands of distinct names with no cache to amortize anything, so
+that per-name cost is multiplied by the whole workload.
+
+Shared code from a sibling project:
+  * Pulse — Copyright (c) 2026 theLabX, MIT License
+    (https://github.com/theLabXHQ/pulse). The following were taken from Pulse
+    and adapted, under the same ownership and licence:
+      - internal/lru (unchanged): bounded LRU used for wildcard verdicts.
+      - internal/logx (unchanged): leveled stderr logger.
+      - internal/version (adapted): link-time version with a build-info
+        fallback; SchemaVersion renamed for subio's ledger.
+      - internal/output (adapted): the one-goroutine bounded-channel writer,
+        flush-on-empty-queue behaviour, and CSV formula-injection
+        neutralization. The record type and text fields are subio's own.
+      - internal/cli (adapted): the grouped-help flag registry and the
+        listFlag / secondsFlag / sizeFlag value types.
+    Pulse's internal/dns was reviewed and deliberately not reused: it is a
+    caching, request-coalescing resolver built to look one host up once, which
+    is the right design for a prober and the wrong one for mass resolution of
+    distinct names.
+
+Provider data:
+  subio ships no provider data. Each adapter in internal/sources records the
+  provider's own documentation and terms URLs, the limits that documentation
+  states, and a reviewed terms state. No provider's data is embedded,
+  redistributed or cached by this repository.
+
+Public services queried outside internal/sources:
+  `subio relate` can read three public services that are not name providers and
+  so have no adapter. None is contacted unless the flag that needs it is given,
+  and the limits relate applies to each are subio's own restraint rather than a
+  figure the service published:
+    * IANA's RDAP bootstrap (data.iana.org/rdap/dns.json) and the registry or
+      registrar RDAP servers it names, with -whois. RDAP is the registries' own
+      protocol (RFC 9082, RFC 9083), unauthenticated and public.
+    * Team Cymru's IP-to-ASN DNS service (origin.asn.cymru.com,
+      origin6.asn.cymru.com, asn.cymru.com), with -asn. Cymru asks that bulk
+      users take their whois interface instead; relate sends one query per
+      target address and one per autonomous system.
+    * RIPEstat's announced-prefixes endpoint (stat.ripe.net), with -asn. Free,
+      keyless, and asked for one request per autonomous system.
